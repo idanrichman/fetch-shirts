@@ -1,0 +1,21 @@
+# amazon search query
+search_query: "shirt"
+search_category: "fashion-womens-clothing"
+# the minimum reviews amount for a product to be fetched
+min_reviews: 1
+# how many products to fetch
+max_products: 10000
+
+# delay intervals between requests - seconds
+min_delay: 2
+max_delay: 5
+
+# folders settings to where to put the outputs to
+data_folder: "data"
+search_results_folder: "search_results"
+tables_folder: "tables"
+
+processed_pairs_folder: "processed"
+# folders inside processed`
+faces_folder: "faces"
+half_face_folder: "half_face"

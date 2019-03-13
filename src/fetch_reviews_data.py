@@ -1,8 +1,4 @@
 #%%
-# Variables
-data_folder = 'data'
-search_results_folder = 'search_results'
-
 # Environment Setup
 import requests
 import pandas as pd
@@ -14,6 +10,8 @@ import time
 import shutil
 import os
 import glob
+
+from settings import settings
 
 #%%
 # Functions definitions
@@ -32,7 +30,7 @@ def get_review_color(review):
     if review_color_tag is not None:
         color_text = [item for item in list(review_color_tag.children) if 'Color:' in item]
         if len(color_text) > 0:
-            review_color = color_text[0].strip('Color: ')        
+            review_color = color_text[0].strip('Color: ')
     return review_color
 
 def extract_hires_url(orig_url):
@@ -55,7 +53,7 @@ def get_review_images_urls(review):
 
 def get_total_reviews_count(reviews_html):
     #len(reviews_html.find_all('div', attrs={'data-hook': "review"}))
-    # should be 8. if less than 8 then this is the last page in the pagination. 
+    # should be 8. if less than 8 then this is the last page in the pagination.
 
     # another approach for pagination (and to avoid unnessacery page reading) is to check the total number of returned search queries and see if we reached the maximum
     total_count_text = reviews_html.find('span', attrs={'data-hook': "cr-filter-info-review-count"}).text
@@ -109,7 +107,7 @@ def summarize_asin(s, asin):
                 data = re.search('jQuery.parseJSON\(\'(.+)\'\);\n', tag.text)
                 if data is not None:
                     data_json = json.loads(data.group(1).replace("\\\'", "\'"))  # the replace just escapes to avoid a common problem
-       
+
         if is_cust_images(html):
             reviews_images_urls = {key: '|'.join(value) for key, value in get_reviews_images_urls(s, asin).items()}
 
@@ -126,25 +124,25 @@ def summarize_asin(s, asin):
                     colors_images[color] = color_urls['hiRes']
                 elif 'large' in color_urls.keys():
                     colors_images[color] = color_urls['large']
-            asin_summary = pd.DataFrame([reviews_images_urls, colors_asin, colors_images], 
+            asin_summary = pd.DataFrame([reviews_images_urls, colors_asin, colors_images],
                                         index=['reviews_images_urls', 'asin', 'image']) \
                                         .T.reset_index().set_index('asin').rename(columns={'index': 'color'}).assign(master_asin=asin).query('color != "unknown"')
     return asin_summary
-    
 
-def get_search_results(search_term = 'shirt', search_cat = 'fashion-womens-clothing', pagenumber = 1):
+
+def get_search_results(s, search_term = 'shirt', search_cat = 'fashion-womens-clothing', pagenumber = 1):
     try:
         result = pd.DataFrame()
-        r = s.get('https://www.amazon.com/s?k=%s&i=%s&page=%i' % (search_term, search_cat, pagenumber))        
+        r = s.get('https://www.amazon.com/s?k=%s&i=%s&page=%i' % (search_term, search_cat, pagenumber))
         if check_response(r):
             search_html = BeautifulSoup(r.content, 'lxml')
             search_results_divs = (search_html.find('div', attrs={'class': 's-result-list sg-row'})
                                              .find_all(lambda tag: tag.has_attr('data-asin')))
-            result = pd.DataFrame([(tag.get('data-asin'), 
-                                  tag.find('img').get('alt'), 
+            result = pd.DataFrame([(tag.get('data-asin'),
+                                  tag.find('img').get('alt'),
                                   extract_hires_url(tag.find('img').get('src')),
-                                  tag.find('img').get('src')) 
-                                 for tag in search_results_divs], 
+                                  tag.find('img').get('src'))
+                                 for tag in search_results_divs],
                                 columns=['asin', 'title', 'image', 'image_thumb']).set_index('asin')
     except:
         None
@@ -165,10 +163,10 @@ def main():
     s = requests.Session()
     s.headers.update({"user-agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"})
 
-    os.makedirs(data_folder, exist_ok=True)
+    os.makedirs(settings['data_folder'], exist_ok=True)
 
     products_sum_list = []
-    products_paths = glob.glob(os.path.join(search_results_folder, '*.jpg'))
+    products_paths = glob.glob(os.path.join(settings['search_results_folder'], '*.jpg'))
     for i, filepath in enumerate(products_paths):
         print('\rfetching product details %i/%i' % (i+1, len(products_paths)), end='')
         asin = os.path.split(filepath)[-1].replace('.jpg', '')  # get only the filename
@@ -181,7 +179,7 @@ def main():
 
     for asin_i, (asin, row) in enumerate(products_sum.iterrows()):
         print('\r%i/%i Fetching product reviews %s         ' % (asin_i+1, len(products_sum), asin), end='')
-        asin_path = os.path.join(data_folder, asin)
+        asin_path = os.path.join(settings['data_folder'], asin)
         os.makedirs(asin_path, exist_ok=True)
         download_jpg(s, row['image'], os.path.join(asin_path, 'product.jpg'))
         for i, review_url in enumerate(row['reviews_images_urls'].split('|')):
