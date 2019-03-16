@@ -89,7 +89,8 @@ def main():
         time.sleep(randint(settings['min_delay'], settings['max_delay']))
 
     search_results = pd.concat(search_results_list)
-    search_results.to_csv(os.path.join(settings['tables_folder'], 'search_results.csv'))
+    search_results = search_results.drop_duplicates(subset=['asin'])
+    search_results.to_csv(os.path.join(settings['tables_folder'], 'search_results_stage1.csv'))
     print('\nDone.')
 
 #%%
