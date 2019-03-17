@@ -10,12 +10,7 @@ import time
 import os
 
 from settings import settings
-
-
-def check_response(r):
-    # assert r.status_code==200, 'bad response'
-    return True if r.ok else False
-
+from helper import check_response, ConnectionBlockedError
 
 def extract_hires_url(orig_url):
     """Take an image url and removes the resolution suffix that is before the .jpg ending"""
@@ -41,6 +36,8 @@ def get_search_results(s, search_term = settings['search_query'], search_cat = s
                                     get_reviews_count_from_asin_tag(tag))
                                  for tag in search_results_divs], 
                                 columns=['asin', 'title', 'image', 'image_thumb', 'reviews']).set_index('asin')
+    except ConnectionBlockedError as e:
+        raise e
     except:
         None
     return result
@@ -52,6 +49,8 @@ def get_max_page_number(s, search_term = settings['search_query'], search_cat = 
         if check_response(r):
             search_html = BeautifulSoup(r.content, 'lxml')
             max_pages = int(search_html.select('ul.a-pagination li')[-2].text.replace(',', ''))
+    except ConnectionBlockedError as e:
+        raise e
     except:
         max_pages = 0
     return max_pages

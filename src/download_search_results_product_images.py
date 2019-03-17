@@ -9,11 +9,7 @@ import shutil
 import os
 
 from settings import settings
-
-
-def check_response(r):
-    # assert r.status_code==200, 'bad response'
-    return True if r.ok else False
+from helper import check_response, ConnectionBlockedError
 
 
 def download_jpg(session, image_url, image_filename):
@@ -23,6 +19,8 @@ def download_jpg(session, image_url, image_filename):
             with open(image_filename, 'wb') as out_file:
                 shutil.copyfileobj(response.raw, out_file)
         success = True
+    except ConnectionBlockedError as e:
+        raise e
     except:  # i don't really care if i'm missing some products on the way
         success = False
 
@@ -32,8 +30,8 @@ def download_jpg(session, image_url, image_filename):
 def main():
     # start_from - for a warm start to continue if stuck
     s = requests.Session()
-    s.headers.update({"user-agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"})
-
+    s.headers.update({"user-agent": settings['header']})
+    
     os.makedirs(settings['search_results_folder'], exist_ok=True)
     search_results = pd.read_csv(os.path.join(settings['tables_folder'],
                                               'search_results_stage2.csv'), index_col='asin')

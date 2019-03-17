@@ -15,11 +15,7 @@ import os
 import pickle
 
 from settings import settings
-
-
-def check_response(r):
-    # assert r.status_code==200, 'bad response'
-    return True if r.ok else False
+from helper import check_response, ConnectionBlockedError
 
 
 def is_cust_images(product_html_bs):
@@ -30,6 +26,8 @@ def fetch_asin_data(s, asin):
     try:
         r = s.get('http://www.amazon.com/dp/%s' % asin)
         check_response(r)
+    except ConnectionBlockedError as e:
+        raise e
     except:
         return None
 
@@ -48,9 +46,8 @@ def fetch_asin_data(s, asin):
 
 
 def main():
-    # start_from - for a warm start to continue if stuck
     s = requests.Session()
-    s.headers.update({"user-agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"})
+    s.headers.update({"user-agent": settings['header']})
 
     # assuming tables folder already exists with a stage1 table in it.
     search_results = pd.read_csv(os.path.join(settings['tables_folder'],

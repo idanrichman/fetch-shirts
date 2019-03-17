@@ -11,12 +11,8 @@ import os
 import glob
 
 from settings import settings
+from helper import check_response, ConnectionBlockedError
 
-# Functions definitions
-
-def check_response(r):
-    #assert r.status_code==200, 'bad response'
-    return True if r.ok else False
 
 def is_cust_images(product_html_bs):
     return len(product_html_bs.find_all('img', alt='Customer image')) > 0
@@ -94,6 +90,8 @@ def summarize_asin(s, asin):
     try:
         r = s.get('http://www.amazon.com/dp/%s' % asin)
         is_ok = check_response(r)
+    except ConnectionBlockedError as e:
+        raise e
     except:
         is_ok = False
 
@@ -142,6 +140,8 @@ def get_search_results(s, search_term = 'shirt', search_cat = 'fashion-womens-cl
                                   tag.find('img').get('src'))
                                  for tag in search_results_divs],
                                 columns=['asin', 'title', 'image', 'image_thumb']).set_index('asin')
+    except ConnectionBlockedError as e:
+        raise e
     except:
         None
     return result
@@ -152,13 +152,15 @@ def download_jpg(session, image_url, image_filename):
         if response.ok:
             with open(image_filename, 'wb') as out_file:
                 shutil.copyfileobj(response.raw, out_file)
+    except ConnectionBlockedError as e:
+        raise e
     except:  # i don't really care if i'm missing some products on the way
         None
 
 
 def main():
     s = requests.Session()
-    s.headers.update({"user-agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"})
+    s.headers.update({"user-agent": settings['header']})
 
     os.makedirs(settings['data_folder'], exist_ok=True)
 
