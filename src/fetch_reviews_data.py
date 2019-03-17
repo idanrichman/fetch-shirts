@@ -1,4 +1,3 @@
-#%%
 # Environment Setup
 import requests
 import pandas as pd
@@ -13,7 +12,6 @@ import glob
 
 from settings import settings
 
-#%%
 # Functions definitions
 
 def check_response(r):
@@ -157,7 +155,6 @@ def download_jpg(session, image_url, image_filename):
     except:  # i don't really care if i'm missing some products on the way
         None
 
-#%%
 
 def main():
     s = requests.Session()
@@ -187,16 +184,11 @@ def main():
 
     print('\nDone.')
 
-#%%
 if __name__ == '__main__':
     main()
 
-#%%
 # s = requests.Session()
 # s.headers.update({"user-agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"})
 
 # summ = summarize_asin(s, 'B01N53IXD6')
 # summ
-
-
-#%%

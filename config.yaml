@@ -12,10 +12,12 @@ max_delay: 5
 
 # folders settings to where to put the outputs to
 data_folder: "data"
-search_results_folder: "search_results"
 tables_folder: "tables"
-
-processed_pairs_folder: "processed"
-# folders inside processed`
+search_results_folder: "search_results"
+# folders inside search_results
 faces_folder: "faces"
 half_face_folder: "half_face"
+jsons_folder: "data_jsons"
+
+
+processed_pairs_folder: "processed"

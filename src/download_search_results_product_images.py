@@ -7,7 +7,6 @@ from random import randint
 import time
 import shutil
 import os
-import sys
 
 from settings import settings
 
@@ -23,34 +22,49 @@ def download_jpg(session, image_url, image_filename):
         if check_response(response):
             with open(image_filename, 'wb') as out_file:
                 shutil.copyfileobj(response.raw, out_file)
+        success = True
     except:  # i don't really care if i'm missing some products on the way
-        None
+        success = False
+
+    return success
 
 
-def main(start_from=0):
+def main():
     # start_from - for a warm start to continue if stuck
     s = requests.Session()
     s.headers.update({"user-agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"})
 
     os.makedirs(settings['search_results_folder'], exist_ok=True)
     search_results = pd.read_csv(os.path.join(settings['tables_folder'],
-                                              'search_results.csv'))
+                                              'search_results_stage2.csv'), index_col='asin')
 
     # no use of downloading products with no reviews
     search_results = search_results[search_results['reviews'] >= settings['min_reviews']]
+    # no use of downloading products with no images reviews
+    search_results = search_results[search_results['has_image_reviews'] == 1]
     search_results = search_results[:settings['max_products']]  # if max_products is larger than the dataframe, it'll return all of the df
 
-    for i, (asin, asin_data) in enumerate(search_results[start_from:].iterrows()):
-        print('\rDownloading %i/%i' % (i+start_from, len(search_results)), end='')
-        image_filename = os.path.join(settings['search_results_folder'], asin + '.jpg')
-        image_url = asin_data['image']
-        download_jpg(s, image_url, image_filename)
-        time.sleep(randint(settings['min_delay'], settings['max_delay']))
+    max_cycles = 10
+    i_cycle = 0
+    fetch_queue = list(search_results.index)
+
+    while (len(fetch_queue) > 0) & (i_cycle < max_cycles):
+        i_cycle += 1
+        print('Cycle %i:' % i_cycle)
+        loop_queue = search_results.loc[fetch_queue]
+
+        for i, (asin, asin_data) in enumerate(loop_queue.iterrows()):
+            print('\rDownloading %i/%i: %s' % (i+1, len(loop_queue), asin), end='')
+            image_filename = os.path.join(settings['search_results_folder'], asin + '.jpg')
+            image_url = asin_data['image']
+            if not os.path.exists(image_filename):  # avoid double downloading
+                if download_jpg(s, image_url, image_filename):
+                    fetch_queue.remove(asin)
+                time.sleep(randint(settings['min_delay'], settings['max_delay']))
+            else:
+                fetch_queue.remove(asin)
+
     print('\nDone.')
 
-
 if __name__ == '__main__':
-    start_from = 0
-    if len(sys.argv) > 1:
-        start_from = sys.argv[1]
-    main(start_from)
+    main()
