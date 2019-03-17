@@ -1,3 +1,8 @@
+# Takes already fetched search results and query product by product to
+# determine if it has costumer reviews with images
+# it will also save a pickle file with the products images urls inside
+# the jsons_folder as defined in config.yaml
+
 # Environment Setup
 import requests
 import pandas as pd
@@ -19,15 +24,6 @@ def check_response(r):
 
 def is_cust_images(product_html_bs):
     return len(product_html_bs.find_all('img', alt='Customer image')) > 0
-
-
-def extract_hires_url(orig_url):
-    """Take an image url and removes the resolution suffix that is before the .jpg ending"""
-    url = None
-    url_matchs = re.match('(.+/images/I/)(.+?)\..*(jpg)', orig_url)
-    if url_matchs is not None:
-        url = url_matchs.group(1) + url_matchs.group(2) + '.' + url_matchs.group(3)
-    return url
 
 
 def fetch_asin_data(s, asin):
@@ -63,7 +59,6 @@ def main():
 
     os.makedirs(settings['jsons_folder'], exist_ok=True)
 
-# FIX THE [0:5] BELOW - REMOVE IT
     max_cycles = 10
     i_cycle = 0
 
@@ -77,6 +72,8 @@ def main():
             time.sleep(randint(settings['min_delay'], settings['max_delay']))
 
     print('\nDone.')
+    if search_results['has_image_reviews'].isna().any():
+        print('Failed to fetch %i products data' % search_results['has_image_reviews'].isna().sum())
     search_results.to_csv(os.path.join(settings['tables_folder'], 'search_results_stage2.csv'))
 
 
