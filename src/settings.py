@@ -14,3 +14,5 @@ for folder in ['faces_folder',
                'half_face_folder',
                'jsons_folder']:
     settings[folder] = os.path.join(settings['search_results_folder'], settings[folder])
+
+settings['header'] = settings['headers'][settings['header_option']]

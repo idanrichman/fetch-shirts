@@ -36,9 +36,11 @@ def get_search_results(s, search_term = settings['search_query'], search_cat = s
                                              .find_all(lambda tag: tag.has_attr('data-asin')))
             result = pd.DataFrame([(tag.get('data-asin'),
                                     tag.find('img').get('alt'),
+                                    extract_hires_url(tag.find('img').get('src')),
                                     tag.find('img').get('src'),
-                                    get_reviews_count_from_asin_tag(tag)) for tag in search_results_divs],
-                                  columns=['asin', 'title', 'image', 'image_thumb', 'reviews']).set_index('asin')
+                                    get_reviews_count_from_asin_tag(tag))
+                                 for tag in search_results_divs], 
+                                columns=['asin', 'title', 'image', 'image_thumb', 'reviews']).set_index('asin')
     except:
         None
     return result
@@ -65,17 +67,17 @@ def main():
     os.makedirs(settings['tables_folder'], exist_ok=True)
 
     s = requests.Session()
-    s.headers.update({"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"})
+    s.headers.update({"user-agent": settings['header']})
 
     search_results_list = []
     num_of_pages_to_fetch = get_max_page_number(s)  # take into account there are about 60 results per page
     for pagenumber in range(num_of_pages_to_fetch):
         print('\rfetching page %i/%i' % (pagenumber+1, num_of_pages_to_fetch), end='')
-        search_results_list.append(get_search_results(s, pagenumber=pagenumber))
+        search_results_list.append(get_search_results(s, pagenumber=pagenumber+1))
         time.sleep(randint(settings['min_delay'], settings['max_delay']))
 
     search_results = pd.concat(search_results_list)
-    search_results = search_results.drop_duplicates(subset=['asin'])
+    search_results = search_results[~search_results.index.duplicated()]  # drop duplicated asins
     search_results.to_csv(os.path.join(settings['tables_folder'], 'search_results_stage1.csv'))
     print('\nDone.')
 
