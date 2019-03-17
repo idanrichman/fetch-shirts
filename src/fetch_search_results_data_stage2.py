@@ -23,25 +23,34 @@ def is_cust_images(product_html_bs):
 
 
 def fetch_asin_data(s, asin):
-    try:
-        r = s.get('http://www.amazon.com/dp/%s' % asin)
-        check_response(r)
-    except ConnectionBlockedError as e:
-        raise e
-    except:
-        return None
+    has_customer_images_reviews = None
+    pickle_path = os.path.join(settings['jsons_folder'], asin + '.pkl')
+    # check if product asin was already scraped. if it was, then return its has_customer_images_reviews result saved before
+    if os.path.exists(pickle_path):
+        with open(pickle_path, "rb") as f:
+            has_customer_images_reviews = pickle.load(f)['has_customer_images_reviews']
+    else:
+        try:
+            time.sleep(randint(settings['min_delay'], settings['max_delay']))
+            r = s.get('http://www.amazon.com/dp/%s' % asin)
+            check_response(r)
+        except ConnectionBlockedError as e:
+            raise e
+        except:
+            return None
 
-    html = BeautifulSoup(r.content.decode(), 'lxml')
+        html = BeautifulSoup(r.content.decode(), 'lxml')
 
-    for tag in html.find_all('script', type='text/javascript'):
-        if 'colorToAsin' in tag.text:  # there's a second jquery match, without the colorToAsin substring
-            data = re.search('jQuery.parseJSON\(\'(.+)\'\);\n', tag.text)
-            if data is not None:
-                data_json = json.loads(data.group(1).replace("\\\'", "\'"))  # the replace just escapes to avoid a common problem
-                with open(os.path.join(settings['jsons_folder'], asin + '.pkl'), "wb") as f:
-                    pickle.dump(data_json, f)
+        for tag in html.find_all('script', type='text/javascript'):
+            if 'colorToAsin' in tag.text:  # there's a second jquery match, without the colorToAsin substring
+                data = re.search('jQuery.parseJSON\(\'(.+)\'\);\n', tag.text)
+                if data is not None:
+                    data_json = json.loads(data.group(1).replace("\\\'", "\'"))  # the replace just escapes to avoid a common problem
+                    has_customer_images_reviews = 1 if is_cust_images(html) else 0
+                    data_json['has_customer_images_reviews'] = has_customer_images_reviews
+                    with open(pickle_path, "wb") as f:
+                        pickle.dump(data_json, f)
 
-    has_customer_images_reviews = 1 if is_cust_images(html) else 0
     return has_customer_images_reviews
 
 
@@ -67,7 +76,7 @@ def main():
         for i, (asin, asin_data) in enumerate(fetch_queue.iterrows()):
             print('\rFetching %i/%i' % (i+1, len(fetch_queue)), end='')
             search_results.loc[asin, 'has_image_reviews'] = fetch_asin_data(s, asin)
-            time.sleep(randint(settings['min_delay'], settings['max_delay']))
+            
 
     print('\nDone.')
     if search_results['has_image_reviews'].isna().any():

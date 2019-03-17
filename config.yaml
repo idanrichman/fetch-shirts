@@ -7,8 +7,8 @@ min_reviews: 1
 max_products: 10000
 
 # delay intervals between requests - seconds
-min_delay: 2
-max_delay: 5
+min_delay: 4
+max_delay: 10
 
 # folders settings to where to put the outputs to
 data_folder: "data"
@@ -23,6 +23,6 @@ processed_pairs_folder: "processed"
 
 # scraping options
 # amazon can block our requests. changing the header may help. try changing back and forth to 0 or 1 if not working
-header_option: 1
-headers: ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36",
+header_option: 0
+headers: ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.121 Safari/537.36",
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.121 Safari/537.36"]
