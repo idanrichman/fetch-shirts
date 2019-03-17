@@ -52,6 +52,7 @@ def main():
     s = requests.Session()
     s.headers.update({"user-agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"})
 
+    # assuming tables folder already exists with a stage1 table in it.
     search_results = pd.read_csv(os.path.join(settings['tables_folder'],
                                               'search_results_stage1.csv'), index_col='asin')
     search_results = search_results[search_results['reviews'] >= settings['min_reviews']]

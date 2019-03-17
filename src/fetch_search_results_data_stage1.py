@@ -62,6 +62,8 @@ def get_reviews_count_from_asin_tag(tag):
 
 
 def main():
+    os.makedirs(settings['data_folder'], exist_ok=True)
+
     s = requests.Session()
     s.headers.update({"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"})
 
