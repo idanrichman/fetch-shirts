@@ -15,7 +15,7 @@ import os
 import pickle
 
 from settings import settings
-from helper import check_response, ConnectionBlockedError
+from helper import check_response, ConnectionBlockedError, PageNotFoundError
 
 
 def is_cust_images(product_html_bs):
@@ -32,12 +32,13 @@ def fetch_asin_data(s, asin):
     else:
         try:
             time.sleep(randint(settings['min_delay'], settings['max_delay']))
-            r = s.get('http://www.amazon.com/dp/%s' % asin)
+            r = s.get('https://www.amazon.com/dp/%s' % asin)
             check_response(r)
         except ConnectionBlockedError as e:
+            print('\nFailed asin: %s' % asin)
             raise e
-        except:
-            return None
+        except Exception as e:
+            print('\n', e)
 
         html = BeautifulSoup(r.content.decode(), 'lxml')
 
