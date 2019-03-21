@@ -39,6 +39,7 @@ def fetch_asin_data(s, asin):
             raise e
         except Exception as e:
             print('\n', e)
+            return None
 
         html = BeautifulSoup(r.content.decode(), 'lxml')
 

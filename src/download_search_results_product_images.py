@@ -28,7 +28,6 @@ def download_jpg(session, image_url, image_filename):
 
 
 def main():
-    # start_from - for a warm start to continue if stuck
     s = requests.Session()
     s.headers.update({"user-agent": settings['header']})
     
