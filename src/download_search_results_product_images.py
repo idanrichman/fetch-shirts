@@ -5,8 +5,8 @@ import requests
 import pandas as pd
 from random import randint
 import time
-import shutil
 import os
+import shutil
 
 from settings import settings
 from helper import check_response, ConnectionBlockedError
@@ -15,7 +15,7 @@ from helper import check_response, ConnectionBlockedError
 def download_jpg(session, image_url, image_filename):
     try:  # mainly to avoid connection error raised
         response = session.get(image_url, stream=True)
-        if check_response(response):
+        if response.ok:  # not using check_response becuase it will ruin the stream=True and create a zero byte files
             with open(image_filename, 'wb') as out_file:
                 shutil.copyfileobj(response.raw, out_file)
         success = True

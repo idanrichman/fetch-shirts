@@ -1,4 +1,3 @@
-#%%
 import cv2
 import os
 import numpy as np
@@ -7,13 +6,13 @@ import glob
 
 from settings import settings
 
-#%%
 # load cascade classifier training file for haarcascade
 haar_face_cascade = cv2.CascadeClassifier(os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_alt.xml'))
 
-#%%
+
 def convertToRGB(img):
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
 
 def is_face_exists(filepath):
     #load iamge
@@ -25,14 +24,19 @@ def is_face_exists(filepath):
 
     return len(faces) > 0
 
-def is_half_face_exists(filepath):
-    """ checks if first row is the same (white usually). if so then its probably not a face cut in half in the margin"""
-    img = cv2.imread(filepath)
-    first_row = img[0,:,:].reshape(-1)
-    last_row = img[-1,:,:].reshape(-1)
-    return (len(np.unique(first_row)) > 1) & (len(np.unique(last_row)) > 1)
 
-#%%
+def is_half_face_exists(filepath, threshold=100):
+    """ checks if first or last row is the same (white usually). 
+        if so then its probably not a face cut in half in the margin.
+        threshold of 100 unique colors was picked based on short manual image testing"""
+    img = cv2.imread(filepath)
+    if img is None:
+        print('Error in file:', filepath)
+    first_row = img[0,:,:].prod(axis=1).reshape(-1)  # multiply R G B to get a unique color id
+    last_row = img[-1,:,:].prod(axis=1).reshape(-1)
+    return (len(np.unique(first_row)) > threshold) | (len(np.unique(last_row)) > threshold)
+
+
 def main():
     # Iterates over the files in the search_results folder
     results = []
@@ -61,6 +65,6 @@ def main():
     valid_count = len(results) - face_count - half_face_count
     print('\nDone. valid: %i, faces: %i, half-faces: %i' % (valid_count, face_count, half_face_count))
 
-#%%
+
 if __name__ == '__main__':
     main()
