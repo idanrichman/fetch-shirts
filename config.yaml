@@ -21,6 +21,9 @@ jsons_folder: "data_jsons"
 
 processed_pairs_folder: "processed"
 
+# Overwrite data when downloading reviews? set to True or False
+overwrite_data: True
+
 # scraping options
 # amazon can block our requests. changing the header may help. try changing back and forth to 0 or 1 if not working
 header_option: 0
