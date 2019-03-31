@@ -11,7 +11,7 @@ import glob
 import pickle
 
 from settings import settings
-from helper import check_response, ConnectionBlockedError
+from helper import check_response, ConnectionBlockedError, PageNotFoundError
 
 
 def get_review_color(review):
@@ -60,30 +60,33 @@ def get_reviews_images_urls(s, asin):
     review_i = 0
     results = {}
 
-    while reached_last_page is False:
-        r = s.get('https://www.amazon.com/product-reviews/%s/?reviewerType=all_reviews&mediaType=media_reviews_only&pageNumber=%i' % (asin, pagenumber))
-        check_response(r)
-        reviews_html = BeautifulSoup(r.content, 'lxml')
-        if pagenumber==1:  # only checking in the first page, because amazon makes mistake and sometimes doesn't show the count line
-            tot_reviews_count = get_total_reviews_count(reviews_html)
+    try:
+        while reached_last_page is False:
+            r = s.get('https://www.amazon.com/product-reviews/%s/?reviewerType=all_reviews&mediaType=media_reviews_only&pageNumber=%i' % (asin, pagenumber))
+            check_response(r)
+            reviews_html = BeautifulSoup(r.content, 'lxml')
+            if pagenumber==1:  # only checking in the first page, because amazon makes mistake and sometimes doesn't show the count line
+                tot_reviews_count = get_total_reviews_count(reviews_html)
 
-        ## find the color and the image of the review
-        reviews = reviews_html.find_all('div', attrs={'data-hook': "review"})
+            ## find the color and the image of the review
+            reviews = reviews_html.find_all('div', attrs={'data-hook': "review"})
 
-        for review in reviews:
-            review_i += 1
-            color = get_review_color(review)
-            urls = get_review_images_urls(review)
+            for review in reviews:
+                review_i += 1
+                color = get_review_color(review)
+                urls = get_review_images_urls(review)
 
-            if color in results.keys():
-                results[color] = results[color] + urls
-            else:
-                results[color] = urls
+                if color in results.keys():
+                    results[color] = results[color] + urls
+                else:
+                    results[color] = urls
 
-        if review_i == tot_reviews_count:
-            reached_last_page = True
+            if review_i == tot_reviews_count:
+                reached_last_page = True
 
-        pagenumber += 1
+            pagenumber += 1
+    except PageNotFoundError as e:  # just skip it
+        None
     return results
 
 
