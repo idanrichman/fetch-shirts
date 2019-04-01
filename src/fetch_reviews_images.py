@@ -9,6 +9,7 @@ import shutil
 import os
 import glob
 import pickle
+import sys
 
 from settings import settings
 from helper import check_response, ConnectionBlockedError, PageNotFoundError
@@ -45,7 +46,7 @@ def get_review_images_urls(review):
     return urls
 
 
-def get_total_reviews_count(reviews_html, default_onerror=30):
+def get_total_reviews_count(reviews_html):
     # len(reviews_html.find_all('div', attrs={'data-hook': "review"}))
     # should be 8. if less than 8 then this is the last page in the pagination.
     # another approach for pagination (and to avoid unnessacery page reading) is to check the total number of returned search queries and see if we reached the maximum
@@ -54,19 +55,23 @@ def get_total_reviews_count(reviews_html, default_onerror=30):
         total_count_text = total_count_tag.text
         total_media_reviews = int(re.match('.+of (\d+) reviews', total_count_text).group(1))
     else:
-        total_media_reviews = default_onerror  # if error when fetching then blind search for reviews
+        print('Could not find total review count')
+        total_media_reviews = 0
     return total_media_reviews
 
 def get_reviews_images_urls(s, asin):
     pagenumber = 1
+    max_pagenumber = 9  # safe limit to avoid endless looping
     reached_last_page = False
     review_i = 0
     results = {}
 
     try:
         while reached_last_page is False:
+            print(pagenumber, end='')
             r = s.get('https://www.amazon.com/product-reviews/%s/?reviewerType=all_reviews&mediaType=media_reviews_only&pageNumber=%i' % (asin, pagenumber))
             check_response(r)
+            print('.', end='')
             reviews_html = BeautifulSoup(r.content, 'lxml')
             if pagenumber==1:  # only checking in the first page, because amazon makes mistake and sometimes doesn't show the count line
                 tot_reviews_count = get_total_reviews_count(reviews_html)
@@ -84,16 +89,18 @@ def get_reviews_images_urls(s, asin):
                 else:
                     results[color] = urls
 
-            if (review_i == tot_reviews_count) | (len(reviews)==0):  # when error finding the tot_reviews_count the second condition can help escaping the loop
+            if (review_i == tot_reviews_count) | (len(reviews)==0) | (pagenumber > max_pagenumber):  # when error finding the tot_reviews_count the second condition can help escaping the loop
+                print('!', end='')
                 reached_last_page = True
 
             pagenumber += 1
     except PageNotFoundError as e:  # just skip it
-        None
+        print(e)
     return results
 
 
 def summarize_asin(s, asin):
+    print('.', end='')
     asin_summary = pd.DataFrame()
     pickle_path = os.path.join(settings['jsons_folder'], asin + '.pkl')
     # check if product asin was already scraped. if it was, then return its has_customer_images_reviews result saved before
@@ -101,6 +108,7 @@ def summarize_asin(s, asin):
         with open(pickle_path, "rb") as f:
             data_json = pickle.load(f)
 
+        print('.', end='')
         reviews_images_urls = {key: '|'.join(value) for key, value in get_reviews_images_urls(s, asin).items()}
         color_list = list(reviews_images_urls.keys())
         for color in color_list:
@@ -109,6 +117,7 @@ def summarize_asin(s, asin):
 
         colors_asin = {color: data_json['colorToAsin'][color]['asin'] for color in reviews_images_urls.keys()}
 
+        print('.', end='')
         # use large / hiRes
         #colors_images = {color: data_json['colorImages'][color][0]['hiRes'] for color in reviews_images_urls.keys() if color != 'unknown'}
         colors_images = dict()
@@ -118,6 +127,7 @@ def summarize_asin(s, asin):
                 colors_images[color] = color_urls['hiRes']
             elif 'large' in color_urls.keys():
                 colors_images[color] = color_urls['large']
+        print('.', end='')
         asin_summary = pd.DataFrame([reviews_images_urls, colors_asin, colors_images],
                                     index=['reviews_images_urls', 'asin', 'image']) \
                                     .T.reset_index().set_index('asin').rename(columns={'index': 'color'}).assign(master_asin=asin)
@@ -139,23 +149,33 @@ def download_jpg(session, image_url, image_filename):
         None
 
 
-def main():
+def main(start_from=0):
     s = requests.Session()
     s.headers.update({"user-agent": settings['header']})
 
     os.makedirs(settings['data_folder'], exist_ok=True)
 
-    products_sum_list = []
-    products_paths = glob.glob(os.path.join(settings['search_results_folder'], '*.jpg'))
+    if os.path.exists('temp_products_sum_list.pkl'):
+        with open('temp_products_sum_list.pkl', "rb") as f:
+            products_sum_list = pickle.load(f)
+    else:
+        products_sum_list = []
+
+    products_paths = glob.glob(os.path.join(settings['search_results_folder'], '*.jpg'))[start_from:]
     for i, filepath in enumerate(products_paths):
-        print('\rfetching product details %i/%i' % (i+1, len(products_paths)), end='')
         asin = os.path.split(filepath)[-1].replace('.jpg', '')  # get only the filename
+        # printing twice. once to delete also the debug dots and symbols.
+        print('\rfetching product details %i/%i: %s %s' % (i+1+start_from, len(products_paths)+start_from, asin, ' '*50), end='')
+        print('\rfetching product details %i/%i: %s' % (i+1+start_from, len(products_paths)+start_from, asin), end='')
         products_sum_list.append(summarize_asin(s, asin))
+        with open('temp_products_sum_list.pkl', "wb") as f:
+            pickle.dump(products_sum_list, f)
         time.sleep(randint(settings['min_delay'], settings['max_delay']))
 
     products_sum = pd.concat(products_sum_list)
     products_sum.to_csv(os.path.join(settings['tables_folder'],
                                               'products_summary.csv'))
+    os.remove('temp_products_sum_list.pkl')
     print('\nDone.')
 
     for asin_i, (asin, row) in enumerate(products_sum.iterrows()):
@@ -172,4 +192,5 @@ def main():
     print('\nDone.')
 
 if __name__ == '__main__':
-    main()
+    start_from = (sys.argv[1]-1) if len(sys.argv) > 1 else 0  # allow to continue where left before
+    main(start_from)
