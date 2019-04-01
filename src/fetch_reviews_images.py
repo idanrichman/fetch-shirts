@@ -45,13 +45,16 @@ def get_review_images_urls(review):
     return urls
 
 
-def get_total_reviews_count(reviews_html):
+def get_total_reviews_count(reviews_html, default_onerror=30):
     # len(reviews_html.find_all('div', attrs={'data-hook': "review"}))
     # should be 8. if less than 8 then this is the last page in the pagination.
-
     # another approach for pagination (and to avoid unnessacery page reading) is to check the total number of returned search queries and see if we reached the maximum
-    total_count_text = reviews_html.find('span', attrs={'data-hook': "cr-filter-info-review-count"}).text
-    total_media_reviews = int(re.match('.+of (\d+) reviews', total_count_text).group(1))
+    total_count_tag = reviews_html.find('span', attrs={'data-hook': "cr-filter-info-review-count"})
+    if total_count_tag is not None:
+        total_count_text = total_count_tag.text
+        total_media_reviews = int(re.match('.+of (\d+) reviews', total_count_text).group(1))
+    else:
+        total_media_reviews = default_onerror  # if error when fetching then blind search for reviews
     return total_media_reviews
 
 def get_reviews_images_urls(s, asin):
@@ -81,7 +84,7 @@ def get_reviews_images_urls(s, asin):
                 else:
                     results[color] = urls
 
-            if review_i == tot_reviews_count:
+            if (review_i == tot_reviews_count) | (len(reviews)==0):  # when error finding the tot_reviews_count the second condition can help escaping the loop
                 reached_last_page = True
 
             pagenumber += 1
