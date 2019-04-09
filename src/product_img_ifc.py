@@ -2,8 +2,11 @@ import dash
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import pickle
+import os
+import time
 from settings import settings
 
+max_sub_imgs = 10
 chosen_img = None
 
 
@@ -45,17 +48,19 @@ class ProductComponents:
 
     def _make_image_component(self, index):
         return html.Img(id='image%i' % index,
-                        src=self.variants_nameurl[index-1][1],
+                        src=self.variants_nameurl[index-1][1] if index <= self.num_of_subimages else '',
+                        title=self.variants_nameurl[index-1][0] if index <= self.num_of_subimages else '',
                         style={'max-width': '%i%%' % (90 / min(self.num_of_subimages,
                                                                self.max_horz_images)),
                                'max-height': '30vh',
                                'border': '5px solid white',
                                'cursor': 'pointer'},
                         accessKey=str(index),
-                        n_clicks_timestamp=0)
+                        n_clicks_timestamp=0,
+                        hidden=0 if index <= self.num_of_subimages else 1)
 
     def _init_sub_imgs(self):
-        return [self._make_image_component(i+1) for i in range(self.num_of_subimages)]
+        return [self._make_image_component(i+1) for i in range(max_sub_imgs)]
 
     def _init_sub_imgs_div(self):
         return html.Div(
@@ -94,15 +99,15 @@ def init_dash(asin):
 def make_img_callbacks(app, product):
     if not product.multi_selection:
         @app.callback([Output('image%i' % (index+1), 'style')
-                       for index in range(product.num_of_subimages)],
+                       for index in range(max_sub_imgs)],
                       [Input('image%i' % (index+1), 'n_clicks_timestamp')
-                       for index in range(product.num_of_subimages)],
+                       for index in range(max_sub_imgs)],
                       [State('image%i' % (index+1), 'style')
-                       for index in range(product.num_of_subimages)])
-        def image_single_select(*args):  # disable to allow multiple selection
+                       for index in range(max_sub_imgs)])
+        def image_single_select(*args):
             global chosen_img
-            inputs = args[:product.num_of_subimages]
-            states = args[product.num_of_subimages:]
+            inputs = args[:max_sub_imgs]
+            states = args[max_sub_imgs:]
             if max(inputs) > 0:
                 _chosen_img = maxIndex(inputs)
                 chosen_img = _chosen_img if _chosen_img != chosen_img else None  # to allow un-selection
@@ -111,7 +116,7 @@ def make_img_callbacks(app, product):
                     else update_dict(states[i], {'border': states[i]['border'].replace('red', 'white')})
                     for i in range(len(states))]
     else:
-        for index in range(product.num_of_subimages):
+        for index in range(max_sub_imgs):
             @app.callback(Output('image%i' % index+1, 'style'),
                           [Input('image%i' % index+1, 'n_clicks')],
                           [State('image%i' % index+1, 'style')])
@@ -129,8 +134,12 @@ def make_callbacks(app):
                   [Input('nextButton', 'n_clicks')],
                   [State('main_img', 'src'), State('sub_div', 'children'), State('asin_div', 'children')])
     def next_button_on_click(n_clicks, orig_src, orig_sub_div, orig_asin):
+        global chosen_img
         if (n_clicks is not None):# & (chosen_img is not None):
-            #return '%s; %s' % (image_filename, subimages_filenames[chosen_img][1])
+            log_results(orig_asin, orig_sub_div)
+            chosen_img = None  # reset the choice
+
+            # initialize next product
             asin = next(asins, None)
             if asin is not None:
                 product = ProductComponents(asin)
@@ -140,13 +149,19 @@ def make_callbacks(app):
         else:
             return (orig_src, orig_sub_div, orig_asin)
 
-    @app.callback(Output('asin_div', 'style'),
-                  [Input('sub_div', 'children')],
-                  [State('asin_div', 'children'), State('asin_div', 'style')])
-    def on_sub_img_chg(asin, style):
-        product = ProductComponents(asin)
-        make_img_callbacks(app, product)
-        return style
+
+def log_results(asin, sub_div):
+    """Saves the user decision."""
+    csv_path = os.path.join(settings['tables_folder'], 'alternative_product_imgs.csv')
+    if not os.path.exists(csv_path):
+        with open(csv_path, "w") as myfile:
+            myfile.write(','.join(['time', 'asin', 'chosen_img', 'title', 'url'])+'\n')
+
+    if chosen_img is not None:
+        title = sub_div[chosen_img]['props']['title']
+        url = sub_div[chosen_img]['props']['src']
+        with open(csv_path, "a") as myfile:
+            myfile.write(','.join([time.strftime("%Y-%m-%d %H:%M:%S"), asin, str(chosen_img), title, url])+'\n')
 
 
 def list_generator(mylist):
@@ -156,8 +171,13 @@ def list_generator(mylist):
         i += 1
 
 
-asins = list_generator(['B00AHXIC96', 'B00BZV0AN0', 'B00CC3LRVE', 'B00DPEY5E0'])
+def load_asins_generator(folder):
+    asins_list = [asin.replace('.jpg', '') for asin in os.listdir(folder) if '.jpg' in asin]
+    asins = list_generator(asins_list)
+    return asins
+
 
 if __name__ == '__main__':
+    asins = load_asins_generator(settings['search_results_folder'])
     app = init_dash(next(asins))
     app.run_server(debug=True)
