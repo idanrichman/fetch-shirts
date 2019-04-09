@@ -2,3 +2,4 @@ output/
 notebooks/
 **/__pycache__
 **.DS_Store
+auth_cred

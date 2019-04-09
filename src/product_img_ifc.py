@@ -5,6 +5,7 @@ import pickle
 import os
 import time
 from settings import settings
+import dash_auth
 
 max_sub_imgs = 10
 chosen_img = None
@@ -183,5 +184,19 @@ def load_asins_generator(folders):
 
 if __name__ == '__main__':
     asins = load_asins_generator([settings['faces_folder'], settings['half_face_folder']])
+    #asins = load_asins_generator([settings['search_results_folder']])
     app = init_dash(next(asins))
-    app.run_server(debug=True)
+
+    # Keep this out of source code repository - save in a file or a database
+    if os.path.exists('../auth_cred'):
+        with open('../auth_cred', 'r') as credfile:
+            VALID_USERNAME_PASSWORD_PAIRS = eval(credfile.read())
+
+        auth = dash_auth.BasicAuth(
+            app,
+            VALID_USERNAME_PASSWORD_PAIRS
+        )
+
+        app.run_server(debug=True, host='0.0.0.0')
+    else:
+        print("Error: can't find auth_cred file. it should contain authenticatin details as [['username', 'password']]")
