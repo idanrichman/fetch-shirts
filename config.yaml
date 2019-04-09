@@ -14,6 +14,7 @@ max_delay: 10
 data_folder: "data"
 tables_folder: "tables"
 search_results_folder: "search_results"
+alternative_product_imgs: "alternative_product_imgs"
 # folders inside search_results
 faces_folder: "faces"
 half_face_folder: "half_face"

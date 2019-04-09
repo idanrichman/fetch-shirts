@@ -6,9 +6,13 @@ import os
 import time
 from settings import settings
 import dash_auth
+import shutil
+import requests
 
 max_sub_imgs = 10
 chosen_img = None
+counter = 0
+tot_count = 0
 
 
 class ProductComponents:
@@ -86,7 +90,8 @@ def init_dash(asin):
     next_button_div = html.Div([next_button], style={'textAlign': 'center', 'margin': '50px'})
     product = ProductComponents(asin)
 
-    app.layout = html.Div([product.main_img_div,
+    app.layout = html.Div([html.Span('1 / 200', id='counter'),
+                           product.main_img_div,
                            html.Div(product.asin, id='asin_div', style={'textAlign': 'center', 'margin': '50px'}),
                            next_button_div,
                            product.sub_imgs_div,
@@ -131,11 +136,15 @@ def make_img_callbacks(app, product):
 
 
 def make_callbacks(app):
-    @app.callback([Output('main_img', 'src'), Output('sub_div', 'children'), Output('asin_div', 'children')],
+    @app.callback([Output('main_img', 'src'), Output('sub_div', 'children'), Output('asin_div', 'children'),
+                   Output('counter', 'children')],
                   [Input('nextButton', 'n_clicks')],
                   [State('main_img', 'src'), State('sub_div', 'children'), State('asin_div', 'children')])
     def next_button_on_click(n_clicks, orig_src, orig_sub_div, orig_asin):
         global chosen_img
+        global counter
+        counter += 1
+        counter_str = '%i / %i' % (counter, tot_count)
         if (n_clicks is not None):# & (chosen_img is not None):
             log_results(orig_asin, orig_sub_div)
             chosen_img = None  # reset the choice
@@ -144,11 +153,11 @@ def make_callbacks(app):
             asin = next(asins, None)
             if asin is not None:
                 product = ProductComponents(asin)
-                return (product.main_img_url, product.sub_imgs_components, asin)
+                return (product.main_img_url, product.sub_imgs_components, asin, counter_str)
             else:
-                return ('', '', '')
+                return ('', '', '', counter_str)
         else:
-            return (orig_src, orig_sub_div, orig_asin)
+            return (orig_src, orig_sub_div, orig_asin, counter_str)
 
 
 def log_results(asin, sub_div):
@@ -156,13 +165,16 @@ def log_results(asin, sub_div):
     csv_path = os.path.join(settings['tables_folder'], 'alternative_product_imgs.csv')
     if not os.path.exists(csv_path):
         with open(csv_path, "w") as myfile:
-            myfile.write(','.join(['time', 'asin', 'chosen_img', 'title', 'url'])+'\n')
+            myfile.write(','.join(['time', 'counter', 'asin', 'chosen_img', 'title', 'url'])+'\n')
 
     if chosen_img is not None:
+        # log choice to file
         title = sub_div[chosen_img]['props']['title']
         url = sub_div[chosen_img]['props']['src']
         with open(csv_path, "a") as myfile:
-            myfile.write(','.join([time.strftime("%Y-%m-%d %H:%M:%S"), asin, str(chosen_img), title, url])+'\n')
+            myfile.write(','.join([time.strftime("%Y-%m-%d %H:%M:%S"), str(counter), asin, str(chosen_img), title, url])+'\n')
+        # save new image as the asin jpeg
+        download_jpg(s, url, os.path.join(settings['alternative_product_imgs'], asin + '.jpg'))
 
 
 def list_generator(mylist):
@@ -178,11 +190,31 @@ def load_asins_generator(folders):
     for folder in folders:
         all_files.extend(os.listdir(folder))
     asins_list = [asin.replace('.jpg', '') for asin in all_files if '.jpg' in asin]
+    global tot_count
+    tot_count = len(asins_list)
     asins = list_generator(asins_list)
     return asins
 
 
+def download_jpg(session, image_url, image_filename):
+    try:  # mainly to avoid connection error raised
+        response = session.get(image_url, stream=True)
+        if response.ok:  # not using check_response becuase it will ruin the stream=True and create a zero byte files
+            with open(image_filename, 'wb') as out_file:
+                shutil.copyfileobj(response.raw, out_file)
+        success = True
+    except:  # i don't really care if i'm missing some products on the way
+        success = False
+
+    return success
+
+
 if __name__ == '__main__':
+    os.makedirs(settings['alternative_product_imgs'], exist_ok=True)
+
+    s = requests.Session()
+    s.headers.update({"user-agent": settings['header']})
+
     asins = load_asins_generator([settings['faces_folder'], settings['half_face_folder']])
     #asins = load_asins_generator([settings['search_results_folder']])
     app = init_dash(next(asins))
