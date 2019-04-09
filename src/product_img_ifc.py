@@ -171,13 +171,17 @@ def list_generator(mylist):
         i += 1
 
 
-def load_asins_generator(folder):
-    asins_list = [asin.replace('.jpg', '') for asin in os.listdir(folder) if '.jpg' in asin]
+def load_asins_generator(folders):
+    """folders is a list of strings."""
+    all_files = []
+    for folder in folders:
+        all_files.extend(os.listdir(folder))
+    asins_list = [asin.replace('.jpg', '') for asin in all_files if '.jpg' in asin]
     asins = list_generator(asins_list)
     return asins
 
 
 if __name__ == '__main__':
-    asins = load_asins_generator(settings['search_results_folder'])
+    asins = load_asins_generator([settings['faces_folder'], settings['half_face_folder']])
     app = init_dash(next(asins))
     app.run_server(debug=True)
