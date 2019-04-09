@@ -1,5 +1,6 @@
 import dash
 import dash_html_components as html
+import dash_core_components as dcc
 from dash.dependencies import Input, Output, State
 import pickle
 import os
@@ -8,6 +9,7 @@ from settings import settings
 import dash_auth
 import shutil
 import requests
+import pandas as pd
 
 max_sub_imgs = 10
 chosen_img = None
@@ -38,7 +40,10 @@ class ProductComponents:
             asin_data = pickle.load(f)
         landingAsinColor = asin_data['landingAsinColor']
         variants = asin_data['colorImages'][landingAsinColor]
-        variants_nameurl = [(variant['variant'], variant['large']) for variant in variants]
+        variants_nameurl = [(variant['variant'],
+                             variant['large'],
+                             variant['hiRes'] if 'hiRes' in variant.keys() else variant['large']  # not all variants has hiRes version
+                             ) for variant in variants]
         return variants_nameurl
 
     def _init_main_img(self):
@@ -55,6 +60,7 @@ class ProductComponents:
         return html.Img(id='image%i' % index,
                         src=self.variants_nameurl[index-1][1] if index <= self.num_of_subimages else '',
                         title=self.variants_nameurl[index-1][0] if index <= self.num_of_subimages else '',
+                        alt=self.variants_nameurl[index-1][2] if index <= self.num_of_subimages else '',
                         style={'max-width': '%i%%' % (90 / min(self.num_of_subimages,
                                                                self.max_horz_images)),
                                'max-height': '30vh',
@@ -90,9 +96,10 @@ def init_dash(asin):
     next_button_div = html.Div([next_button], style={'textAlign': 'center', 'margin': '50px'})
     product = ProductComponents(asin)
 
-    app.layout = html.Div([html.Span('1 / 200', id='counter'),
+    app.layout = html.Div([html.Span(id='counter'), html.Span(' '*10),
+                           dcc.Input(id='jump', debounce=True, type='number', min=1, max=tot_count),
+                           html.Span(' '*10), html.Span(product.asin, id='asin_div', style={'textAlign': 'center', 'margin': '50px'}),
                            product.main_img_div,
-                           html.Div(product.asin, id='asin_div', style={'textAlign': 'center', 'margin': '50px'}),
                            next_button_div,
                            product.sub_imgs_div,
                            ])
@@ -138,26 +145,37 @@ def make_img_callbacks(app, product):
 def make_callbacks(app):
     @app.callback([Output('main_img', 'src'), Output('sub_div', 'children'), Output('asin_div', 'children'),
                    Output('counter', 'children')],
-                  [Input('nextButton', 'n_clicks')],
-                  [State('main_img', 'src'), State('sub_div', 'children'), State('asin_div', 'children')])
-    def next_button_on_click(n_clicks, orig_src, orig_sub_div, orig_asin):
+                  [Input('nextButton', 'n_clicks'), Input('jump', 'value')],
+                  [State('main_img', 'src'), State('sub_div', 'children'), State('asin_div', 'children'),
+                   State('nextButton', 'n_clicks_timestamp'), State('jump', 'n_submit_timestamp')])
+    def next_button_on_click(n_clicks, override_counter, orig_src, orig_sub_div, orig_asin, next_ts, jump_ts):
         global chosen_img
         global counter
-        counter += 1
-        counter_str = '%i / %i' % (counter, tot_count)
-        if (n_clicks is not None):# & (chosen_img is not None):
+
+        if (jump_ts is not None) & (next_ts is not None):
+            next_ts_str = pd.Timestamp(next_ts*1e6).strftime('%Y-%m-%dT%H:%M:%S.%fz')
+            if jump_ts > next_ts_str:
+                counter = override_counter - 2
+
+        if (n_clicks is not None):
+            counter += 1
+            counter_str = '%i / %i' % (counter+1, tot_count)
+
             log_results(orig_asin, orig_sub_div)
             chosen_img = None  # reset the choice
 
             # initialize next product
-            asin = next(asins, None)
+            try:
+                asin = asins[counter]
+            except IndexError:  # if reached the end of counter
+                asin = None
             if asin is not None:
                 product = ProductComponents(asin)
                 return (product.main_img_url, product.sub_imgs_components, asin, counter_str)
             else:
                 return ('', '', '', counter_str)
         else:
-            return (orig_src, orig_sub_div, orig_asin, counter_str)
+            return (orig_src, orig_sub_div, orig_asin, '%i / %i' % (counter+1, tot_count))
 
 
 def log_results(asin, sub_div):
@@ -171,20 +189,14 @@ def log_results(asin, sub_div):
         # log choice to file
         title = sub_div[chosen_img]['props']['title']
         url = sub_div[chosen_img]['props']['src']
+        hires_url = sub_div[chosen_img]['props']['alt']
         with open(csv_path, "a") as myfile:
             myfile.write(','.join([time.strftime("%Y-%m-%d %H:%M:%S"), str(counter), asin, str(chosen_img), title, url])+'\n')
         # save new image as the asin jpeg
-        download_jpg(s, url, os.path.join(settings['alternative_product_imgs'], asin + '.jpg'))
+        download_jpg(s, hires_url, os.path.join(settings['alternative_product_imgs'], asin + '.jpg'))
 
 
-def list_generator(mylist):
-    i = 0
-    while i < len(mylist):
-        yield mylist[i]
-        i += 1
-
-
-def load_asins_generator(folders):
+def load_asins_list(folders):
     """folders is a list of strings."""
     all_files = []
     for folder in folders:
@@ -192,8 +204,7 @@ def load_asins_generator(folders):
     asins_list = [asin.replace('.jpg', '') for asin in all_files if '.jpg' in asin]
     global tot_count
     tot_count = len(asins_list)
-    asins = list_generator(asins_list)
-    return asins
+    return asins_list
 
 
 def download_jpg(session, image_url, image_filename):
@@ -215,9 +226,9 @@ if __name__ == '__main__':
     s = requests.Session()
     s.headers.update({"user-agent": settings['header']})
 
-    asins = load_asins_generator([settings['faces_folder'], settings['half_face_folder']])
-    #asins = load_asins_generator([settings['search_results_folder']])
-    app = init_dash(next(asins))
+    asins = load_asins_list([settings['faces_folder'], settings['half_face_folder']])
+    #asins = load_asins_list([settings['search_results_folder']])
+    app = init_dash(asins[counter])
 
     # Keep this out of source code repository - save in a file or a database
     if os.path.exists('../auth_cred'):
