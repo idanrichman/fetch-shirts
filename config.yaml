@@ -18,6 +18,7 @@ alternative_product_imgs: "alternative_product_imgs"
 # folders inside search_results
 faces_folder: "faces"
 half_face_folder: "half_face"
+filtered_out_folder: "filtered_out"
 jsons_folder: "data_jsons"
 
 processed_pairs_folder: "processed"

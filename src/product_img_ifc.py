@@ -226,7 +226,7 @@ if __name__ == '__main__':
     s = requests.Session()
     s.headers.update({"user-agent": settings['header']})
 
-    asins = load_asins_list([settings['faces_folder'], settings['half_face_folder']])
+    asins = load_asins_list([settings['faces_folder'], settings['half_face_folder'], settings['filtered_out_folder']])
     #asins = load_asins_list([settings['search_results_folder']])
     app = init_dash(asins[counter])
 
