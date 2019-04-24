@@ -22,6 +22,8 @@ filtered_out_folder: "filtered_out"
 jsons_folder: "data_jsons"
 
 processed_pairs_folder: "processed"
+filtered_pairs_folder: "filtered"
+train_data_folder: "train_data"
 
 # Overwrite data when downloading reviews? set to True or False
 overwrite_data: True

@@ -7,6 +7,8 @@ with open(os.path.join('..', 'config.yaml'), 'r') as stream:
 for folder in ['data_folder',
                'search_results_folder',
                'processed_pairs_folder',
+               'filtered_pairs_folder',
+               'train_data_folder',
                'tables_folder',
                'alternative_product_imgs']:
     settings[folder] = os.path.join('..', 'output', settings[folder])
